@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0b0d" />
+  <title>CONNECT CLUB • Produção Executiva</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">CC</div>
+        <div><strong>CONNECT CLUB</strong><span>Produção Executiva</span></div>
+      </div>
+      <nav id="nav">
+        <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
+        <button class="nav-btn" data-tab="budget">Orçamento</button>
+        <button class="nav-btn" data-tab="tickets">Ingressos & Receitas</button>
+        <button class="nav-btn" data-tab="activity">Histórico</button>
+        <button class="nav-btn" data-tab="settings">Configurações</button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="sync-card">
+          <span id="syncDot" class="sync-dot local"></span>
+          <div><strong id="syncLabel">Modo local</strong><small id="syncDetail">Salvo neste navegador</small></div>
+        </div>
+        <button id="shareBtn" class="btn btn-gold btn-block">Ativar link compartilhado</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CASA VILLA ZENIA • JOÁ • RIO DE JANEIRO</p>
+          <h1 id="pageTitle">Dashboard financeiro</h1>
+        </div>
+        <div class="top-actions">
+          <button id="exportBtn" class="btn btn-ghost">Backup JSON</button>
+          <label class="btn btn-ghost file-label">Restaurar<input id="importInput" type="file" accept="application/json" hidden></label>
+          <button id="addExpenseTop" class="btn btn-gold">+ Novo item</button>
+        </div>
+      </header>
+
+      <section id="tab-dashboard" class="tab active">
+        <div class="notice" id="dataQualityNotice"></div>
+        <div class="metric-grid">
+          <article class="metric-card"><span>Custo projetado</span><strong id="mBudget">R$ 0</strong><small>melhor valor conhecido + contingência</small></article>
+          <article class="metric-card"><span>Custo parcial</span><strong id="mContracted">R$ 0</strong><small id="mContractedDetail">valores já preenchidos</small></article>
+          <article class="metric-card"><span>Pago</span><strong id="mPaid">R$ 0</strong><small id="mPayable">R$ 0 a pagar</small></article>
+          <article class="metric-card"><span>Taxas + comissões</span><strong id="mFees">R$ 0</strong><small>projeção com ingressos esgotados</small></article>
+          <article class="metric-card"><span>Receita potencial</span><strong id="mRevenue">R$ 0</strong><small>ingressos + receitas extras</small></article>
+          <article class="metric-card accent"><span>Lucro esperado</span><strong id="mProfit">R$ 0</strong><small>com os custos hoje preenchidos</small></article>
+        </div>
+
+        <div class="dash-grid">
+          <article class="panel break-panel">
+            <div class="panel-head"><div><p class="eyebrow">PONTO DE EQUILÍBRIO</p><h2>Break-even</h2></div><span class="pill" id="beLot">—</span></div>
+            <div class="break-main"><strong id="beTickets">0</strong><span>ingressos</span></div>
+            <p id="beText" class="muted">Preencha os custos para calcular.</p>
+            <div class="progress"><div id="beProgress"></div></div>
+            <div class="mini-stats"><div><span>Receita bruta até BE</span><strong id="beGross">R$ 0</strong></div><div><span>Receita líquida até BE</span><strong id="beNet">R$ 0</strong></div><div><span>Meta de vendas</span><strong id="bePct">0%</strong></div></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">ORÇAMENTO</p><h2>Custos por categoria</h2></div></div>
+            <div class="chart-wrap"><div id="donut" class="donut"><div><strong id="donutTotal">R$ 0</strong><span>total</span></div></div><div id="categoryLegend" class="legend"></div></div>
+          </article>
+        </div>
+
+        <div class="dash-grid lower">
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">RECEITA</p><h2>Ingressos por lote</h2></div><span id="ticketSoldLabel" class="pill">0/100 vendidos</span></div>
+            <div id="lotBars" class="lot-bars"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">CONTROLE</p><h2>Pendências críticas</h2></div><button class="link-btn" data-go="budget">Ver orçamento</button></div>
+            <div id="criticalList" class="critical-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="tab-budget" class="tab">
+        <div class="toolbar">
+          <div class="search"><input id="searchExpense" placeholder="Buscar item, fornecedor, observação..." /></div>
+          <select id="filterCategory"><option value="">Todas as categorias</option></select>
+          <select id="filterStatus"><option value="">Todos os status</option><option>Planejado</option><option>Cotando</option><option>Fechado</option><option>Pago</option><option>Cancelado</option></select>
+          <button id="addExpenseBtn" class="btn btn-gold">+ Adicionar item</button>
+        </div>
+        <div class="summary-strip">
+          <div><span>Itens</span><strong id="sItems">0</strong></div><div><span>Com valor</span><strong id="sPriced">0</strong></div><div><span>Sem orçamento</span><strong id="sUnpriced">0</strong></div><div><span>Fechados/Pagos</span><strong id="sClosed">0</strong></div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Categoria</th><th>Item</th><th>Qtd.</th><th>Previsto</th><th>Fechado</th><th>Pago</th><th>Status</th><th>Responsável</th><th></th></tr></thead><tbody id="expenseRows"></tbody></table></div>
+      </section>
+
+      <section id="tab-tickets" class="tab">
+        <div class="section-grid">
+          <article class="panel span-2">
+            <div class="panel-head"><div><p class="eyebrow">BILHETERIA</p><h2>Lotes de ingressos</h2></div><button id="addLotBtn" class="btn btn-ghost">+ Lote</button></div>
+            <div class="table-wrap flat"><table><thead><tr><th>Lote</th><th>Preço</th><th>Capacidade</th><th>Vendidos</th><th>Receita potencial</th><th></th></tr></thead><tbody id="ticketRows"></tbody></table></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">RECEITAS EXTRAS</p><h2>Patrocínios e outros</h2></div><button id="addRevenueBtn" class="btn btn-ghost">+ Receita</button></div>
+            <div id="revenueList" class="revenue-list"></div>
+          </article>
+        </div>
+        <article class="panel top-gap">
+          <div class="panel-head"><div><p class="eyebrow">UNIT ECONOMICS</p><h2>Como cada ingresso contribui</h2></div></div>
+          <div class="unit-grid" id="unitEconomics"></div>
+        </article>
+      </section>
+
+      <section id="tab-activity" class="tab">
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">AUDITORIA</p><h2>Histórico de alterações</h2></div><button id="clearActivity" class="btn btn-ghost">Limpar histórico</button></div><div id="activityList" class="activity-list"></div></article>
+      </section>
+
+      <section id="tab-settings" class="tab">
+        <div class="section-grid">
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">EVENTO</p><h2>Configurações gerais</h2></div></div>
+            <div class="form-grid">
+              <label>Nome do evento<input id="setEventName"></label>
+              <label>Local<input id="setVenue"></label>
+              <label>Responsável / seu nome<input id="setEditor"></label>
+              <label>Contingência (%)<input id="setContingency" type="number" min="0" step="0.1"></label>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><p class="eyebrow">VENDAS</p><h2>Taxas e comissões</h2></div></div>
+            <div class="form-grid">
+              <label>Comissão influenciador (%)<input id="setCommission" type="number" min="0" max="100" step="0.1"></label>
+              <label>Vendas via influenciadores (%)<input id="setAffiliateShare" type="number" min="0" max="100" step="1"></label>
+              <label>Taxa plataforma (%)<input id="setPlatformFee" type="number" min="0" max="100" step="0.1"></label>
+              <label>Taxa pagamento (%)<input id="setPaymentFee" type="number" min="0" max="100" step="0.1"></label>
+              <label>Impostos sobre receita (%)<input id="setTax" type="number" min="0" max="100" step="0.1"></label>
+            </div>
+            <p class="hint">O break-even usa a ordem dos lotes e desconta essas taxas do valor de cada ingresso.</p>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-head"><div><p class="eyebrow">COLABORAÇÃO</p><h2>Workspace compartilhado</h2></div></div>
+            <div class="share-box">
+              <div><strong id="shareStatusTitle">Este projeto está salvo apenas neste navegador.</strong><p id="shareStatusText">Ative o modo compartilhado para gerar um link único que toda a equipe poderá abrir e editar.</p></div>
+              <button id="shareBtnSettings" class="btn btn-gold">Ativar link compartilhado</button>
+            </div>
+            <div id="shareLinkWrap" class="share-link-wrap hidden"><input id="shareLink" readonly><button id="copyShareLink" class="btn btn-ghost">Copiar link</button></div>
+            <p class="hint">O modo compartilhado usa uma base JSON remota. Quem tiver o link terá acesso de edição. Não armazene senhas, documentos pessoais ou dados sensíveis.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="expenseModal" class="modal">
+    <form id="expenseForm" method="dialog">
+      <div class="modal-head"><div><p class="eyebrow">ORÇAMENTO</p><h2 id="expenseModalTitle">Novo item</h2></div><button type="button" class="icon-btn" data-close="expenseModal">×</button></div>
+      <input id="expId" type="hidden">
+      <div class="form-grid cols-3">
+        <label>Categoria<select id="expCategory" required></select></label>
+        <label class="span-2">Item<input id="expName" required placeholder="Ex.: Gelo para bar"></label>
+        <label>Quantidade<input id="expQty" type="number" min="0" step="0.01" value="1"></label>
+        <label>Valor unitário previsto<input id="expEstimate" type="number" min="0" step="0.01" placeholder="0,00"></label>
+        <label>Valor unitário fechado<input id="expActual" type="number" min="0" step="0.01" placeholder="0,00"></label>
+        <label>Valor pago até agora<input id="expPaid" type="number" min="0" step="0.01" placeholder="0,00"></label>
+        <label>Status<select id="expStatus"><option>Planejado</option><option>Cotando</option><option>Fechado</option><option>Pago</option><option>Cancelado</option></select></label>
+        <label>Prioridade<select id="expPriority"><option>Normal</option><option>Alta</option><option>Crítica</option></select></label>
+        <label>Responsável<input id="expOwner"></label>
+        <label>Fornecedor<input id="expSupplier"></label>
+        <label>Contato fornecedor<input id="expContact"></label>
+        <label>Vencimento<input id="expDue" type="date"></label>
+        <label class="span-3">Detalhes<textarea id="expDetails" rows="2" placeholder="Escopo, quantidade, especificações..."></textarea></label>
+        <label class="span-3">Observações<textarea id="expNotes" rows="3" placeholder="Condições, pendências, negociação..."></textarea></label>
+      </div>
+      <div class="modal-actions"><button type="button" class="btn btn-ghost" data-close="expenseModal">Cancelar</button><button type="submit" class="btn btn-gold">Salvar item</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="lotModal" class="modal small"><form id="lotForm" method="dialog"><div class="modal-head"><h2>Lote de ingressos</h2><button type="button" class="icon-btn" data-close="lotModal">×</button></div><input id="lotId" type="hidden"><div class="form-grid"><label>Nome<input id="lotName" required></label><label>Preço<input id="lotPrice" type="number" required min="0" step="0.01"></label><label>Capacidade<input id="lotCapacity" type="number" required min="0" step="1"></label><label>Vendidos<input id="lotSold" type="number" required min="0" step="1"></label></div><div class="modal-actions"><button type="button" class="btn btn-ghost" data-close="lotModal">Cancelar</button><button class="btn btn-gold">Salvar</button></div></form></dialog>
+  <dialog id="revenueModal" class="modal small"><form id="revenueForm" method="dialog"><div class="modal-head"><h2>Receita extra</h2><button type="button" class="icon-btn" data-close="revenueModal">×</button></div><input id="revId" type="hidden"><div class="form-grid"><label>Descrição<input id="revName" required></label><label>Valor previsto<input id="revExpected" type="number" min="0" step="0.01"></label><label>Valor confirmado<input id="revConfirmed" type="number" min="0" step="0.01"></label><label>Status<select id="revStatus"><option>Prospectando</option><option>Negociando</option><option>Confirmado</option><option>Recebido</option></select></label><label class="span-2">Observações<textarea id="revNotes" rows="3"></textarea></label></div><div class="modal-actions"><button type="button" class="btn btn-ghost" data-close="revenueModal">Cancelar</button><button class="btn btn-gold">Salvar</button></div></form></dialog>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
