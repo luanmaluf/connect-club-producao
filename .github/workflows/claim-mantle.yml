@@ -1,0 +1,74 @@
+name: Extend MantleDB Workspace Retention
+
+on:
+  push:
+    paths:
+      - ".github/workflows/claim-mantle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Claim namespace and wire key
+        shell: bash
+        run: |
+          if grep -q "CONNECT_CLUB_MANTLE_KEY" shared-config.js; then
+            echo "Namespace already claimed."
+            exit 0
+          fi
+
+          REMOTE=$(grep -oE 'https://mantledb.sh/v2/[A-Za-z0-9-]+/state' shared-config.js | head -1)
+          test -n "$REMOTE"
+          NS=$(echo "$REMOTE" | sed -E 's#https://mantledb.sh/v2/([^/]+)/state#\1#')
+          echo "Claiming namespace: $NS"
+
+          curl -fsS "https://mantledb.sh/v2/claim/$NS" -o /tmp/claim.json
+          cat /tmp/claim.json
+          KEY=$(python -c "import json; print(json.load(open('/tmp/claim.json'))['key'])")
+          test -n "$KEY"
+
+          curl -fsS "$REMOTE" -H "X-Mantle-Key: $KEY" -o /tmp/readback.json
+          python - <<'PY'
+          import gzip,base64,json
+          p=json.load(open('/tmp/readback.json'))
+          d=json.loads(gzip.decompress(base64.b64decode(p['data'])))
+          assert d['settings']['eventName']=='CONNECT CLUB'
+          print("Claimed workspace verified:",len(d['expenses']),"items")
+          PY
+
+          python - "$KEY" <<'PY'
+          import sys
+          p='shared-config.js'
+          key=sys.argv[1]
+          s=open(p,encoding='utf-8').read()
+          marker='window.CONNECT_CLUB_REMOTE_URL='
+          pos=s.find('\n', s.find(marker))
+          s=s[:pos+1] + 'window.CONNECT_CLUB_MANTLE_KEY=' + repr(key).replace("'", '"') + ';\n' + s[pos+1:]
+          s=s.replace(
+            "const sharedUrl = window.CONNECT_CLUB_REMOTE_URL;",
+            "const sharedUrl = window.CONNECT_CLUB_REMOTE_URL;\n  const mantleKey = window.CONNECT_CLUB_MANTLE_KEY;"
+          )
+          s=s.replace(
+            "const r = await originalFetch(sharedUrl + '?t=' + Date.now(), {cache:'no-store'});",
+            "const r = await originalFetch(sharedUrl + '?t=' + Date.now(), {cache:'no-store',headers:{'X-Mantle-Key':mantleKey}});"
+          )
+          s=s.replace(
+            "headers:{'Content-Type':'application/json'},\n        body:packed",
+            "headers:{'Content-Type':'application/json','X-Mantle-Key':mantleKey},\n        body:packed"
+          )
+          open(p,'w',encoding='utf-8').write(s)
+          PY
+
+          node --check shared-config.js
+          git config user.name "connect-club-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add shared-config.js
+          git commit -m "Estende retenção do workspace MantleDB"
+          git push
