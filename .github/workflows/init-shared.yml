@@ -30,7 +30,7 @@ jobs:
         if: steps.existing.outputs.exists != 'true'
         shell: bash
         run: |
-          sed '/function calc()/,$d' app1.js > /tmp/seed-part.js
+          awk '/^function calc/{exit} {print}' app1.js > /tmp/seed-part.js
           cat >> /tmp/seed-part.js <<'NODE'
           const s = defaultState();
           s.activity = [];
