@@ -1,8 +1,10 @@
 // CONNECT CLUB — workspace compartilhado automático
 window.CONNECT_CLUB_REMOTE_URL="https://mantledb.sh/v2/connect-club-0b2e2cd1eb364ad49fab8f8e7a8e8d97/state";
+window.CONNECT_CLUB_MANTLE_KEY="cc1174f36d7bade9c16affa0dcb3d6b90a5266ac67dd8b07179928ff338df101";
 
 (function(){
   const sharedUrl = window.CONNECT_CLUB_REMOTE_URL;
+  const mantleKey = window.CONNECT_CLUB_MANTLE_KEY;
   const originalFetch = window.fetch.bind(window);
 
   function bytesToBase64(bytes) {
@@ -40,7 +42,7 @@ window.CONNECT_CLUB_REMOTE_URL="https://mantledb.sh/v2/connect-club-0b2e2cd1eb36
     const method = String((init && init.method) || 'GET').toUpperCase();
 
     if (method === 'GET') {
-      const r = await originalFetch(sharedUrl + '?t=' + Date.now(), {cache:'no-store'});
+      const r = await originalFetch(sharedUrl + '?t=' + Date.now(), {cache:'no-store',headers:{'X-Mantle-Key':mantleKey}});
       if (!r.ok) return r;
       const packed = await r.json();
       if (!packed || packed.encoding !== 'gzip-base64' || !packed.data) {
@@ -56,7 +58,7 @@ window.CONNECT_CLUB_REMOTE_URL="https://mantledb.sh/v2/connect-club-0b2e2cd1eb36
       const packed = JSON.stringify({encoding:'gzip-base64',data,format:'connect-club-state-v1',updatedAt:new Date().toISOString()});
       return originalFetch(sharedUrl, {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'application/json','X-Mantle-Key':mantleKey},
         body:packed
       });
     }
