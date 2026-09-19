@@ -1,0 +1,49 @@
+name: Verify Final Shared Workspace
+
+on:
+  push:
+    paths:
+      - ".github/workflows/verify-final.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify shared read and write
+        shell: bash
+        run: |
+          node --check shared-config.js
+          REMOTE=$(grep -oE 'https://mantledb.sh/v2/[A-Za-z0-9-]+/state' shared-config.js | head -1)
+          KEY=$(grep -oE 'CONNECT_CLUB_MANTLE_KEY="[^"]+"' shared-config.js | head -1 | cut -d'"' -f2)
+          test -n "$REMOTE"
+          test -n "$KEY"
+
+          curl -fsS -D /tmp/get.headers -o /tmp/state.packed             "$REMOTE"             -H "Origin: https://luanmaluf.github.io"             -H "X-Mantle-Key: $KEY"
+          grep -qi "access-control-allow-origin" /tmp/get.headers
+
+          python - <<'PY'
+          import json,gzip,base64
+          p=json.load(open('/tmp/state.packed'))
+          d=json.loads(gzip.decompress(base64.b64decode(p['data'])))
+          assert d['settings']['eventName']=='CONNECT CLUB'
+          assert len(d['expenses']) > 100
+          print("Read OK:",len(d['expenses']),"items")
+          PY
+
+          CODE=$(curl -sS -D /tmp/post.headers -o /tmp/post.body -w "%{http_code}"             -X POST "$REMOTE"             -H "Origin: https://luanmaluf.github.io"             -H "X-Mantle-Key: $KEY"             -H "Content-Type: application/json"             --data-binary @/tmp/state.packed)
+          echo "POST status: $CODE"
+          cat /tmp/post.body
+          test "$CODE" = "200"
+          grep -qi "access-control-allow-origin" /tmp/post.headers
+
+          sleep 3
+          curl -fsS "https://luanmaluf.github.io/connect-club-producao/" -o /tmp/site.html
+          curl -fsS "https://luanmaluf.github.io/connect-club-producao/shared-config.js" -o /tmp/public-config.js
+          grep -q "shared-config.js" /tmp/site.html
+          grep -q "CONNECT_CLUB_MANTLE_KEY" /tmp/public-config.js
+          grep -q "mantledb.sh/v2/" /tmp/public-config.js
+          echo "Public site and shared backend OK"
