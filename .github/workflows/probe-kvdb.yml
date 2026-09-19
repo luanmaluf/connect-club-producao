@@ -1,0 +1,41 @@
+name: Probe KVdb Shared Storage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-kvdb.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe KVdb
+        shell: bash
+        run: |
+          CODE=$(curl -sS -D /tmp/create.headers -o /tmp/create.body -w "%{http_code}"             -d "email=connectclub@users.noreply.github.com&default_ttl=7776000"             https://kvdb.io/ || true)
+          echo "CREATE_CODE=$CODE"
+          cat /tmp/create.headers
+          cat /tmp/create.body
+          test "$CODE" = "200"
+          BUCKET=$(tr -d '\r\n ' </tmp/create.body)
+          test -n "$BUCKET"
+          echo "BUCKET=$BUCKET" >> "$GITHUB_ENV"
+
+          echo '{"hello":"connect-club"}' >/tmp/value.txt
+          WCODE=$(curl -sS -D /tmp/write.headers -o /tmp/write.body -w "%{http_code}"             --data-binary @/tmp/value.txt             "https://kvdb.io/$BUCKET/test" || true)
+          echo "WRITE_CODE=$WCODE"
+          cat /tmp/write.headers
+          cat /tmp/write.body
+          test "$WCODE" = "200"
+
+          curl -sS -D /tmp/get.headers -o /tmp/get.body             -H "Origin: https://luanmaluf.github.io"             "https://kvdb.io/$BUCKET/test"
+          echo "GET_HEADERS"
+          cat /tmp/get.headers
+          echo "GET_BODY"
+          cat /tmp/get.body
+          grep -qi "access-control-allow-origin" /tmp/get.headers
+
+          curl -sS -D /tmp/options.headers -o /tmp/options.body -X OPTIONS             "https://kvdb.io/$BUCKET/test"             -H "Origin: https://luanmaluf.github.io"             -H "Access-Control-Request-Method: POST"             -H "Access-Control-Request-Headers: content-type"
+          echo "OPTIONS_HEADERS"
+          cat /tmp/options.headers
+          grep -qi "access-control-allow-origin" /tmp/options.headers
