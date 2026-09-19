@@ -53,13 +53,17 @@ jobs:
         id: create
         shell: bash
         run: |
-          RESPONSE=$(curl --fail-with-body -sS -X POST "https://api.jsonstorage.net/v1/json"             -H "Content-Type: application/json"             --data-binary @/tmp/connect-club-seed.json)
+          RESPONSE=$(curl --fail-with-body -sS -X POST "https://superjsonblob.com/api/jsonBlob" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/connect-club-seed.json)
           echo "$RESPONSE" > /tmp/response.json
-          URI=$(python - <<'PY'
+          BLOB_ID=$(python - <<'PY'
           import json
-          print(json.load(open('/tmp/response.json'))['uri'])
+          print(json.load(open('/tmp/response.json'))['id'])
           PY
           )
+          URI="https://superjsonblob.com/api/jsonBlob/$BLOB_ID"
+          curl --fail-with-body -sS -H "Origin: https://luanmaluf.github.io" "$URI" >/tmp/verify.json
           echo "uri=$URI" >> "$GITHUB_OUTPUT"
 
       - name: Write shared config
