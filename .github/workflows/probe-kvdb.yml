@@ -16,7 +16,7 @@ jobs:
           echo "CREATE_CODE=$CODE"
           cat /tmp/create.headers
           cat /tmp/create.body
-          test "$CODE" = "200"
+          test "$CODE" = "201"
           BUCKET=$(tr -d '\r\n ' </tmp/create.body)
           test -n "$BUCKET"
           echo "BUCKET=$BUCKET" >> "$GITHUB_ENV"
