@@ -179,6 +179,6 @@
   <dialog id="revenueModal" class="modal small"><form id="revenueForm" method="dialog"><div class="modal-head"><h2>Receita extra</h2><button type="button" class="icon-btn" data-close="revenueModal">×</button></div><input id="revId" type="hidden"><div class="form-grid"><label>Descrição<input id="revName" required></label><label>Valor previsto<input id="revExpected" type="number" min="0" step="0.01"></label><label>Valor confirmado<input id="revConfirmed" type="number" min="0" step="0.01"></label><label>Status<select id="revStatus"><option>Prospectando</option><option>Negociando</option><option>Confirmado</option><option>Recebido</option></select></label><label class="span-2">Observações<textarea id="revNotes" rows="3"></textarea></label></div><div class="modal-actions"><button type="button" class="btn btn-ghost" data-close="revenueModal">Cancelar</button><button class="btn btn-gold">Salvar</button></div></form></dialog>
 
   <div id="toast" class="toast"></div>
-  <script src="app.js"></script>
+  <script src="shared-config.js"></script>\n  <script src="app.js"></script>
 </body>
 </html>
