@@ -1,0 +1,37 @@
+name: Probe MantleDB Shared Storage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-mantle.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe MantleDB
+        shell: bash
+        run: |
+          NS="connect-club-probe-$(date +%s)-$RANDOM"
+          URL="https://mantledb.sh/v2/$NS/state"
+          echo '{"hello":"connect-club","n":1}' >/tmp/test.json
+
+          WCODE=$(curl -sS -D /tmp/write.headers -o /tmp/write.body -w "%{http_code}"             -X POST "$URL" -H "Content-Type: application/json" --data-binary @/tmp/test.json)
+          echo "WRITE_CODE=$WCODE"
+          cat /tmp/write.headers
+          cat /tmp/write.body
+          test "$WCODE" = "200"
+
+          curl -sS -D /tmp/get.headers -o /tmp/get.body             -H "Origin: https://luanmaluf.github.io" "$URL"
+          echo "GET_HEADERS"
+          cat /tmp/get.headers
+          echo "GET_BODY"
+          cat /tmp/get.body
+          grep -qi "access-control-allow-origin" /tmp/get.headers
+          grep -q '"hello":"connect-club"' /tmp/get.body
+
+          curl -sS -D /tmp/options.headers -o /tmp/options.body -X OPTIONS "$URL"             -H "Origin: https://luanmaluf.github.io"             -H "Access-Control-Request-Method: POST"             -H "Access-Control-Request-Headers: content-type"
+          echo "OPTIONS_HEADERS"
+          cat /tmp/options.headers
+          grep -qi "access-control-allow-origin" /tmp/options.headers
+          grep -Eqi "access-control-allow-methods:.*POST|allow:.*POST" /tmp/options.headers
