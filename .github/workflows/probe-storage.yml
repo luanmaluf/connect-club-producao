@@ -1,0 +1,31 @@
+name: Probe Browser Storage
+
+on:
+  push:
+    paths:
+      - ".github/workflows/probe-storage.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe ExtendsClass
+        shell: bash
+        run: |
+          echo '{"hello":"connect-club"}' >/tmp/test.json
+          CODE=$(curl -sS -D /tmp/post.headers -o /tmp/post.body -w "%{http_code}" -X POST "https://json.extendsclass.com/bin" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/test.json || true)
+          echo "POST_CODE=$CODE"
+          cat /tmp/post.headers || true
+          cat /tmp/post.body || true
+          if [ "$CODE" = "201" ]; then
+            URI=$(python -c "import json; print(json.load(open('/tmp/post.body'))['uri'])")
+            echo "URI=$URI"
+            curl -sS -D /tmp/options.headers -o /dev/null -X OPTIONS "$URI" \
+              -H "Origin: https://luanmaluf.github.io" \
+              -H "Access-Control-Request-Method: PUT" \
+              -H "Access-Control-Request-Headers: content-type" || true
+            echo "OPTIONS HEADERS"
+            cat /tmp/options.headers || true
+          fi
