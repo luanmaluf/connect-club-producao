@@ -1,0 +1,91 @@
+name: Initialize Shared CONNECT CLUB Workspace
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/init-shared.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stop if workspace already exists
+        id: existing
+        shell: bash
+        run: |
+          if [ -f shared-config.js ] && grep -q "api.jsonstorage.net" shared-config.js; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build compact initial state
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          sed '/function calc()/,$d' app1.js > /tmp/seed-part.js
+          cat >> /tmp/seed-part.js <<'NODE'
+          const s = defaultState();
+          s.activity = [];
+          s.expenses = s.expenses.map(e => ({
+            id:e.id,
+            category:e.category,
+            name:e.name,
+            qty:e.qty,
+            status:e.status,
+            priority:e.priority,
+            included:e.included
+          }));
+          console.log(JSON.stringify(s));
+          NODE
+          node /tmp/seed-part.js > /tmp/connect-club-seed.json
+          echo "Seed bytes: $(wc -c < /tmp/connect-club-seed.json)"
+
+      - name: Create shared JSON workspace
+        if: steps.existing.outputs.exists != 'true'
+        id: create
+        shell: bash
+        run: |
+          RESPONSE=$(curl --fail-with-body -sS -X POST "https://api.jsonstorage.net/v1/json"             -H "Content-Type: application/json"             --data-binary @/tmp/connect-club-seed.json)
+          echo "$RESPONSE" > /tmp/response.json
+          URI=$(python - <<'PY'
+          import json
+          print(json.load(open('/tmp/response.json'))['uri'])
+          PY
+          )
+          echo "uri=$URI" >> "$GITHUB_OUTPUT"
+
+      - name: Write shared config
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        env:
+          REMOTE_URI: ${{ steps.create.outputs.uri }}
+        run: |
+          python - <<'PY'
+          import json, os
+          uri=os.environ['REMOTE_URI']
+          js = (
+            "window.CONNECT_CLUB_REMOTE_URL=" + json.dumps(uri) + ";\n"
+            "(function(){try{var u=new URL(window.location.href);"
+            "if(!u.searchParams.get('db')){u.searchParams.set('db',window.CONNECT_CLUB_REMOTE_URL);"
+            "history.replaceState(null,'',u.toString());}}catch(e){console.error(e);}})();\n"
+          )
+          open('shared-config.js','w',encoding='utf-8').write(js)
+          PY
+
+      - name: Commit shared workspace pointer
+        if: steps.existing.outputs.exists != 'true'
+        shell: bash
+        run: |
+          git config user.name "connect-club-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add shared-config.js
+          git commit -m "Ativa workspace compartilhado automático"
+          git push
