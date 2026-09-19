@@ -72,3 +72,5 @@ window.CONNECT_CLUB_REMOTE_URL="https://mantledb.sh/v2/connect-club-0b2e2cd1eb36
     }
   } catch (e) { console.error(e); }
 })();
+
+// deploy-ready
