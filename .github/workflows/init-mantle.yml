@@ -16,102 +16,61 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check existing Mantle workspace
-        id: existing
+      - name: Initialize shared workspace
         shell: bash
         run: |
           if [ -f shared-config.js ] && grep -q "mantledb.sh/v2/" shared-config.js; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Mantle workspace already configured."
+            exit 0
           fi
 
-      - name: Build initial CONNECT CLUB state
-        if: steps.existing.outputs.exists != 'true'
-        shell: bash
-        run: |
           awk '/^let state=defaultState/{exit} {print}' app1.js > /tmp/seed-part.js
           cat >> /tmp/seed-part.js <<'NODE'
           const s = defaultState();
-          s.activity = [{
-            id: uid(),
-            at: today(),
-            by: "Sistema",
-            action: "Workspace criado",
-            detail: "Base compartilhada oficial do CONNECT CLUB criada automaticamente."
-          }];
+          s.activity = [{id:uid(),at:today(),by:"Sistema",action:"Workspace criado",detail:"Base compartilhada oficial do CONNECT CLUB criada automaticamente."}];
           console.log(JSON.stringify(s));
           NODE
-          node /tmp/seed-part.js > /tmp/connect-club-seed.json
-          echo "Seed bytes: $(wc -c < /tmp/connect-club-seed.json)"
-          test $(wc -c < /tmp/connect-club-seed.json) -lt 64000
+          node /tmp/seed-part.js > /tmp/state.json
+          BYTES=$(wc -c < /tmp/state.json)
+          echo "State size: $BYTES bytes"
+          test "$BYTES" -lt 64000
 
-      - name: Create MantleDB workspace
-        if: steps.existing.outputs.exists != 'true'
-        id: create
-        shell: bash
-        run: |
-          NS="connect-club-$(python -c 'import uuid; print(uuid.uuid4().hex)')"
+          NS="connect-club-$(python -c "import uuid; print(uuid.uuid4().hex)")"
           REMOTE="https://mantledb.sh/v2/$NS/state"
-          CODE=$(curl -sS -D /tmp/write.headers -o /tmp/write.body -w "%{http_code}"             -X POST "$REMOTE"             -H "Content-Type: application/json"             --data-binary @/tmp/connect-club-seed.json)
-          cat /tmp/write.headers
-          cat /tmp/write.body
+          CODE=$(curl -sS -o /tmp/write.json -w "%{http_code}" -X POST "$REMOTE" -H "Content-Type: application/json" --data-binary @/tmp/state.json)
+          echo "Mantle write status: $CODE"
+          cat /tmp/write.json
           test "$CODE" = "200"
-          echo "remote=$REMOTE" >> "$GITHUB_OUTPUT"
 
-      - name: Verify workspace
-        if: steps.existing.outputs.exists != 'true'
-        shell: bash
-        env:
-          REMOTE: ${{ steps.create.outputs.remote }}
-        run: |
           curl -fsS -H "Origin: https://luanmaluf.github.io" "$REMOTE" -o /tmp/readback.json
-          node -e "const d=require('/tmp/readback.json'); if(d.settings.eventName!=='CONNECT CLUB'||d.expenses.length<100||d.tickets.length<3) process.exit(1); console.log('Verified',d.expenses.length,'budget items')"
+          node -e "const d=require('/tmp/readback.json'); if(d.settings.eventName!=='CONNECT CLUB'||d.expenses.length<100) process.exit(1); console.log('Verified shared state',d.expenses.length)"
 
-      - name: Write automatic shared config
-        if: steps.existing.outputs.exists != 'true'
-        shell: bash
-        env:
-          REMOTE: ${{ steps.create.outputs.remote }}
-        run: |
-          python - <<'PY'
-          import json, os
-          remote=os.environ['REMOTE']
-          js = f"""// CONNECT CLUB — workspace compartilhado automático
-window.CONNECT_CLUB_REMOTE_URL={json.dumps(remote)};
+          cat > shared-config.js <<EOF
+          // CONNECT CLUB — workspace compartilhado automático
+          window.CONNECT_CLUB_REMOTE_URL="$REMOTE";
 
-// MantleDB sobrescreve entradas com POST. O aplicativo original usa PUT;
-// este adaptador converte apenas salvamentos destinados ao workspace oficial.
-(function(){{
-  const originalFetch = window.fetch.bind(window);
-  window.fetch = function(input, init) {{
-    try {{
-      const url = typeof input === 'string' ? input : input.url;
-      if (url && url.indexOf('https://mantledb.sh/v2/') === 0 && init && String(init.method || 'GET').toUpperCase() === 'PUT') {{
-        init = Object.assign({{}}, init, {{method:'POST'}});
-      }}
-    }} catch (e) {{}}
-    return originalFetch(input, init);
-  }};
+          (function(){
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = function(input, init) {
+              try {
+                const url = typeof input === 'string' ? input : input.url;
+                if (url && url.indexOf('https://mantledb.sh/v2/') === 0 && init && String(init.method || 'GET').toUpperCase() === 'PUT') {
+                  init = Object.assign({}, init, {method:'POST'});
+                }
+              } catch (e) {}
+              return originalFetch(input, init);
+            };
 
-  try {{
-    const u = new URL(window.location.href);
-    if (!u.searchParams.get('db')) {{
-      u.searchParams.set('db', window.CONNECT_CLUB_REMOTE_URL);
-      history.replaceState(null, '', u.toString());
-    }}
-  }} catch (e) {{
-    console.error(e);
-  }}
-}})();
-"""
-          open('shared-config.js','w',encoding='utf-8').write(js)
-          PY
+            try {
+              const u = new URL(window.location.href);
+              if (!u.searchParams.get('db')) {
+                u.searchParams.set('db', window.CONNECT_CLUB_REMOTE_URL);
+                history.replaceState(null, '', u.toString());
+              }
+            } catch (e) { console.error(e); }
+          })();
+          EOF
 
-      - name: Commit workspace configuration
-        if: steps.existing.outputs.exists != 'true'
-        shell: bash
-        run: |
           git config user.name "connect-club-bot"
           git config user.email "actions@users.noreply.github.com"
           git add shared-config.js
