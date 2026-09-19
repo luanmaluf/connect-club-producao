@@ -20,7 +20,7 @@ jobs:
         id: existing
         shell: bash
         run: |
-          if [ -f shared-config.js ] && grep -q "api.jsonstorage.net" shared-config.js; then
+          if [ -f shared-config.js ] && grep -Eq "superjsonblob.com|api.jsonstorage.net" shared-config.js; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
