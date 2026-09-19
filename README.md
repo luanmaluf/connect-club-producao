@@ -18,3 +18,6 @@ Dashboard e orçamento colaborativo para o evento CONNECT CLUB.
 O botão **Ativar link compartilhado** cria, pelo navegador, uma base JSON remota em jsonstorage.net e acrescenta o endereço dessa base ao link do site. Quem receber o link poderá ler e editar a mesma base.
 
 Este modo é aberto: quem tiver o link tem acesso de edição. Não use para dados sensíveis.
+
+
+<!-- publish-shared-workspace-final -->
