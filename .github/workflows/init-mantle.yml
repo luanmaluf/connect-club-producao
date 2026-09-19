@@ -31,40 +31,108 @@ jobs:
           console.log(JSON.stringify(s));
           NODE
           node /tmp/seed-part.js > /tmp/state.json
-          BYTES=$(wc -c < /tmp/state.json)
-          echo "State size: $BYTES bytes"
-          test "$BYTES" -lt 64000
+
+          python - <<'PY'
+          import gzip, base64, json
+          raw=open('/tmp/state.json','rb').read()
+          packed={
+            "encoding":"gzip-base64",
+            "data":base64.b64encode(gzip.compress(raw,9)).decode(),
+            "format":"connect-club-state-v1"
+          }
+          open('/tmp/packed.json','w',encoding='utf-8').write(json.dumps(packed,separators=(',',':')))
+          print("Raw bytes:",len(raw),"Packed bytes:",len(open('/tmp/packed.json','rb').read()))
+          PY
+          test $(wc -c < /tmp/packed.json) -lt 64000
 
           NS="connect-club-$(python -c "import uuid; print(uuid.uuid4().hex)")"
           REMOTE="https://mantledb.sh/v2/$NS/state"
-          CODE=$(curl -sS -o /tmp/write.json -w "%{http_code}" -X POST "$REMOTE" -H "Content-Type: application/json" --data-binary @/tmp/state.json)
+          CODE=$(curl -sS -o /tmp/write.json -w "%{http_code}" -X POST "$REMOTE" -H "Content-Type: application/json" --data-binary @/tmp/packed.json)
           echo "Mantle write status: $CODE"
           cat /tmp/write.json
           test "$CODE" = "200"
 
           curl -fsS -H "Origin: https://luanmaluf.github.io" "$REMOTE" -o /tmp/readback.json
-          node -e "const d=require('/tmp/readback.json'); if(d.settings.eventName!=='CONNECT CLUB'||d.expenses.length<100) process.exit(1); console.log('Verified shared state',d.expenses.length)"
+          python - <<'PY'
+          import gzip,base64,json
+          p=json.load(open('/tmp/readback.json'))
+          d=json.loads(gzip.decompress(base64.b64decode(p['data'])))
+          assert d['settings']['eventName']=='CONNECT CLUB'
+          assert len(d['expenses']) > 100
+          print("Verified shared state:",len(d['expenses']),"items")
+          PY
 
           cat > shared-config.js <<EOF
           // CONNECT CLUB — workspace compartilhado automático
           window.CONNECT_CLUB_REMOTE_URL="$REMOTE";
 
           (function(){
+            const sharedUrl = window.CONNECT_CLUB_REMOTE_URL;
             const originalFetch = window.fetch.bind(window);
-            window.fetch = function(input, init) {
-              try {
-                const url = typeof input === 'string' ? input : input.url;
-                if (url && url.indexOf('https://mantledb.sh/v2/') === 0 && init && String(init.method || 'GET').toUpperCase() === 'PUT') {
-                  init = Object.assign({}, init, {method:'POST'});
+
+            function bytesToBase64(bytes) {
+              let out = '';
+              const step = 0x8000;
+              for (let i = 0; i < bytes.length; i += step) {
+                out += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + step, bytes.length)));
+              }
+              return btoa(out);
+            }
+
+            function base64ToBytes(text) {
+              const bin = atob(text);
+              const out = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+              return out;
+            }
+
+            async function gzipText(text) {
+              const stream = new Blob([new TextEncoder().encode(text)]).stream().pipeThrough(new CompressionStream('gzip'));
+              const buf = await new Response(stream).arrayBuffer();
+              return bytesToBase64(new Uint8Array(buf));
+            }
+
+            async function gunzipText(b64) {
+              const bytes = base64ToBytes(b64);
+              const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+              return await new Response(stream).text();
+            }
+
+            window.fetch = async function(input, init) {
+              const url = typeof input === 'string' ? input : input.url;
+              if (url !== sharedUrl) return originalFetch(input, init);
+
+              const method = String((init && init.method) || 'GET').toUpperCase();
+
+              if (method === 'GET') {
+                const r = await originalFetch(sharedUrl + '?t=' + Date.now(), {cache:'no-store'});
+                if (!r.ok) return r;
+                const packed = await r.json();
+                if (!packed || packed.encoding !== 'gzip-base64' || !packed.data) {
+                  return new Response(JSON.stringify(packed), {status:200,headers:{'Content-Type':'application/json'}});
                 }
-              } catch (e) {}
+                const jsonText = await gunzipText(packed.data);
+                return new Response(jsonText, {status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+              }
+
+              if (method === 'PUT') {
+                const body = typeof init.body === 'string' ? init.body : await new Response(init.body).text();
+                const data = await gzipText(body);
+                const packed = JSON.stringify({encoding:'gzip-base64',data,format:'connect-club-state-v1',updatedAt:new Date().toISOString()});
+                return originalFetch(sharedUrl, {
+                  method:'POST',
+                  headers:{'Content-Type':'application/json'},
+                  body:packed
+                });
+              }
+
               return originalFetch(input, init);
             };
 
             try {
               const u = new URL(window.location.href);
               if (!u.searchParams.get('db')) {
-                u.searchParams.set('db', window.CONNECT_CLUB_REMOTE_URL);
+                u.searchParams.set('db', sharedUrl);
                 history.replaceState(null, '', u.toString());
               }
             } catch (e) { console.error(e); }
