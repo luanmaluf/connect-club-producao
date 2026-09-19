@@ -1,1 +1,35 @@
-name: Verify Shared Workspace\n\non:\n  push:\n    paths:\n      - ".github/workflows/verify-shared.yml"\n\npermissions:\n  contents: read\n\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Wait for Pages edge\n        run: sleep 5\n      - name: Verify public site and shared config\n        shell: bash\n        run: |\n          SITE="https://luanmaluf.github.io/connect-club-producao/"\n          curl --fail-with-body -sS "$SITE" >/tmp/site.html\n          grep -q "shared-config.js" /tmp/site.html\n          curl --fail-with-body -sS "${SITE}shared-config.js" >/tmp/shared.js\n          grep -q "superjsonblob.com/api/jsonBlob/" /tmp/shared.js\n          REMOTE=$(python - <<'PY'\n          import re\n          s=open('/tmp/shared.js',encoding='utf-8').read()\n          print(re.search(r'https://superjsonblob\\.com/api/jsonBlob/[A-Za-z0-9-]+',s).group(0))\n          PY\n          )\n          echo "Remote: $REMOTE"\n          curl --fail-with-body -sS -H "Origin: https://luanmaluf.github.io" "$REMOTE" >/tmp/data.json\n          python - <<'PY'\n          import json\n          d=json.load(open('/tmp/data.json'))\n          assert d['settings']['eventName']=='CONNECT CLUB'\n          assert len(d['tickets'])>=3\n          assert len(d['expenses'])>100\n          print('Shared data OK:', len(d['expenses']), 'items')\n          PY\n          curl -sS -D /tmp/cors.headers -o /dev/null -X OPTIONS "$REMOTE" \\n            -H "Origin: https://luanmaluf.github.io" \\n            -H "Access-Control-Request-Method: PUT" \\n            -H "Access-Control-Request-Headers: content-type"\n          cat /tmp/cors.headers\n          grep -qi "access-control-allow-origin" /tmp/cors.headers\n          grep -Eqi "access-control-allow-methods:.*PUT|access-control-allow-methods:.*put" /tmp/cors.headers\n
+name: Verify Shared Workspace
+on:
+  push:
+    paths:
+      - ".github/workflows/verify-shared.yml"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public site
+        shell: bash
+        run: |
+          sleep 5
+          SITE="https://luanmaluf.github.io/connect-club-producao/"
+          curl -fsS "$SITE" -o /tmp/site.html
+          grep -q "shared-config.js" /tmp/site.html
+          curl -fsS "${SITE}shared-config.js" -o /tmp/shared.js
+          REMOTE=$(grep -oE 'https://superjsonblob.com/api/jsonBlob/[A-Za-z0-9-]+' /tmp/shared.js | head -1)
+          test -n "$REMOTE"
+          echo "REMOTE=$REMOTE" >> "$GITHUB_ENV"
+          curl -fsS -H "Origin: https://luanmaluf.github.io" "$REMOTE" -o /tmp/data.json
+          node -e "const d=require('/tmp/data.json'); if(d.settings.eventName!=='CONNECT CLUB'||d.expenses.length<100||d.tickets.length<3) process.exit(1); console.log('shared data ok',d.expenses.length)"
+
+      - name: Verify browser PUT CORS
+        shell: bash
+        run: |
+          curl -sS -D /tmp/headers.txt -o /dev/null -X OPTIONS "$REMOTE" \
+            -H "Origin: https://luanmaluf.github.io" \
+            -H "Access-Control-Request-Method: PUT" \
+            -H "Access-Control-Request-Headers: content-type"
+          cat /tmp/headers.txt
+          grep -qi "access-control-allow-origin" /tmp/headers.txt
+          grep -Eqi "access-control-allow-methods:.*PUT" /tmp/headers.txt
